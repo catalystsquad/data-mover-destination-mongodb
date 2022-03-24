@@ -21,6 +21,16 @@ type MongoDBDestination struct {
 	Collection              *mongo.Collection
 }
 
+func NewMongoDBDestination(uri, connectionTimeout, queryTimeout, database, collection string) *MongoDBDestination {
+	return &MongoDBDestination{
+		Uri:                     uri,
+		ConnectionTimeoutString: connectionTimeout,
+		QueryTimeoutString:      queryTimeout,
+		DatabaseName:            database,
+		CollectionName:          collection,
+	}
+}
+
 func (d *MongoDBDestination) Initialize() error {
 	var err error
 	d.ConnectionTimeout, err = time.ParseDuration(d.ConnectionTimeoutString)
@@ -68,7 +78,8 @@ func (d *MongoDBDestination) Persist(data []map[string]interface{}) error {
 
 func toDocs(data []map[string]interface{}) (docs []interface{}, err error) {
 	for _, item := range data {
-		doc, err := toDoc(item)
+		var doc interface{}
+		doc, err = toDoc(item)
 		if err != nil {
 			return
 		}
