@@ -2,10 +2,14 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/catalystsquad/data-mover-core/pkg"
 	pkg2 "github.com/catalystsquad/data-mover-destination-mongodb/pkg"
+	"github.com/orlangure/gnomock"
+	"github.com/orlangure/gnomock/preset/mongo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 	"sync"
@@ -17,21 +21,34 @@ var sourceData []map[string]interface{}
 var lock = new(sync.Mutex)
 var source pkg.Source
 var dest *pkg2.MongoDBDestination
+var mongoContainer *gnomock.Container
+var mongoUser, mongoPass = "test", "test"
 
 type DestinationSuite struct {
 	suite.Suite
 }
 
 func (s *DestinationSuite) SetupSuite() {
+	var err error
+	preset := mongo.Preset(
+		// this could be removed to run without a user/pass, just update the uri as well
+		mongo.WithUser(mongoUser, mongoPass),
+	)
+	mongoContainer, err = gnomock.Start(preset)
+	require.NoError(s.T(), err)
 }
 
 func (s *DestinationSuite) TearDownSuite() {
+	err := gnomock.Stop(mongoContainer)
+	require.NoError(s.T(), err)
 }
 
 func (s *DestinationSuite) SetupTest() {
+	addr := mongoContainer.DefaultAddress()
+	uri := fmt.Sprintf("mongodb://%s:%s@%s", mongoUser, mongoPass, addr)
 	// init source and destination
 	source = TestSource{}
-	dest = pkg2.NewMongoDBDestination("mongodb://localhost:27017", "10s", "10s", "test", "test")
+	dest = pkg2.NewMongoDBDestination(uri, "10s", "10s", "test", "test")
 	err := dest.Initialize()
 	assert.NoError(s.T(), err)
 	// init variables
