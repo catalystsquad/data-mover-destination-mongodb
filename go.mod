@@ -4,13 +4,13 @@ go 1.18
 
 require (
 	github.com/brianvoe/gofakeit/v6 v6.15.0
-	github.com/catalystsquad/data-mover-core v0.0.0-20220324171604-f2cf2d454606
+	github.com/catalystsquad/data-mover-core v1.0.0
 	github.com/stretchr/testify v1.7.1
 	go.mongodb.org/mongo-driver v1.8.4
 )
 
 require (
-	github.com/catalystsquad/app-utils-go v1.0.4-0.20220324154143-4849c3070d57 // indirect
+	github.com/catalystsquad/app-utils-go v1.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
