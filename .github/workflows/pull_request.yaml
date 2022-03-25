@@ -26,6 +26,6 @@ jobs:
         with:
           mongodb-version: 5.0
       - name: Test
-        uses: catalystsquad/action-test-go@init
+        uses: catalystsquad/action-test-go@v1
         with:
           pre-command: git config --global url."https://${{ secrets.AUTOMATION_PAT }}@github.com".insteadOf "https://github.com"
