@@ -50,7 +50,10 @@ func TestSuite(t *testing.T) {
 }
 
 func (s *DestinationSuite) TestConcurrentMove() {
-	mover, err := pkg.NewDataMover(10, 10, true, source, dest)
+	errorHandler := func(err error) bool {
+		return true
+	}
+	mover, err := pkg.NewDataMover(10, 10, source, dest, errorHandler, errorHandler)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), mover)
 	stats, err := mover.Move()
