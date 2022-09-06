@@ -2,11 +2,12 @@ package pkg
 
 import (
 	"context"
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"time"
 )
 
 type MongoDBDestination struct {
@@ -17,17 +18,21 @@ type MongoDBDestination struct {
 	QueryTimeout            time.Duration
 	DatabaseName            string
 	CollectionName          string
+	MongoIndexModels        []mongo.IndexModel
+	UpsertFilterFields      []string
 	Client                  *mongo.Client
 	Collection              *mongo.Collection
 }
 
-func NewMongoDBDestination(uri, connectionTimeout, queryTimeout, database, collection string) *MongoDBDestination {
+func NewMongoDBDestination(uri, connectionTimeout, queryTimeout, database, collection string, upsertFilterFields []string, mongoIndexModels []mongo.IndexModel) *MongoDBDestination {
 	return &MongoDBDestination{
 		Uri:                     uri,
 		ConnectionTimeoutString: connectionTimeout,
 		QueryTimeoutString:      queryTimeout,
 		DatabaseName:            database,
 		CollectionName:          collection,
+		MongoIndexModels:        mongoIndexModels,
+		UpsertFilterFields:      upsertFilterFields,
 	}
 }
 
@@ -62,30 +67,38 @@ func (d *MongoDBDestination) Initialize() error {
 	// set the collection
 	d.Collection = d.Client.Database(d.DatabaseName).Collection(d.CollectionName)
 
+	// create collection indexes for improving upsert capability
+	if len(d.MongoIndexModels) > 0 {
+		_, err = d.Collection.Indexes().CreateMany(ctx, d.MongoIndexModels)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (d *MongoDBDestination) Persist(data []map[string]interface{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), d.QueryTimeout)
 	defer cancel()
-	docs, err := toDocs(data)
-	if err != nil {
-		return err
-	}
-	_, err = d.Collection.InsertMany(ctx, docs)
-	return err
-}
 
-func toDocs(data []map[string]interface{}) (docs []interface{}, err error) {
 	for _, item := range data {
+		setItem := map[string]interface{}{"$set": item}
 		var doc interface{}
-		doc, err = toDoc(item)
+		doc, err := toDoc(setItem)
 		if err != nil {
-			return
+			return err
 		}
-		docs = append(docs, doc)
+		filter := bson.M{}
+		for _, field := range d.UpsertFilterFields {
+			filter[field] = item[field]
+		}
+		_, err = d.Collection.UpdateOne(ctx, filter, doc, options.Update().SetUpsert(true))
+		if err != nil {
+			return err
+		}
 	}
-	return
+	return nil
 }
 
 func toDoc(v interface{}) (doc *bson.D, err error) {
