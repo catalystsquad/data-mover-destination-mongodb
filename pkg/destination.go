@@ -2,11 +2,12 @@ package pkg
 
 import (
 	"context"
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"time"
 )
 
 type MongoDBDestination struct {
@@ -17,17 +18,19 @@ type MongoDBDestination struct {
 	QueryTimeout            time.Duration
 	DatabaseName            string
 	CollectionName          string
+	UniqueIDFieldName       string
 	Client                  *mongo.Client
 	Collection              *mongo.Collection
 }
 
-func NewMongoDBDestination(uri, connectionTimeout, queryTimeout, database, collection string) *MongoDBDestination {
+func NewMongoDBDestination(uri, connectionTimeout, queryTimeout, database, collection, uniqueIDFieldName string) *MongoDBDestination {
 	return &MongoDBDestination{
 		Uri:                     uri,
 		ConnectionTimeoutString: connectionTimeout,
 		QueryTimeoutString:      queryTimeout,
 		DatabaseName:            database,
 		CollectionName:          collection,
+		UniqueIDFieldName:       uniqueIDFieldName,
 	}
 }
 
@@ -62,30 +65,32 @@ func (d *MongoDBDestination) Initialize() error {
 	// set the collection
 	d.Collection = d.Client.Database(d.DatabaseName).Collection(d.CollectionName)
 
-	return nil
+	// set a unique ID field index on the collection
+	_, err = d.Collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: d.UniqueIDFieldName, Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	return err
 }
 
 func (d *MongoDBDestination) Persist(data []map[string]interface{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), d.QueryTimeout)
 	defer cancel()
-	docs, err := toDocs(data)
-	if err != nil {
-		return err
-	}
-	_, err = d.Collection.InsertMany(ctx, docs)
-	return err
-}
 
-func toDocs(data []map[string]interface{}) (docs []interface{}, err error) {
 	for _, item := range data {
+		setItem := map[string]interface{}{"$set": item}
 		var doc interface{}
-		doc, err = toDoc(item)
+		doc, err := toDoc(setItem)
 		if err != nil {
-			return
+			return err
 		}
-		docs = append(docs, doc)
+		filter := bson.M{d.UniqueIDFieldName: item[d.UniqueIDFieldName]}
+		_, err = d.Collection.UpdateOne(ctx, filter, doc, options.Update().SetUpsert(true))
+		if err != nil {
+			return err
+		}
 	}
-	return
+	return nil
 }
 
 func toDoc(v interface{}) (doc *bson.D, err error) {
