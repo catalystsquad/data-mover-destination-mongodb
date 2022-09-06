@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/catalystsquad/data-mover-destination-mongodb/compare/v1.0.1...v1.1.0) (2022-09-06)
+
+
+### Features
+
+* implement upsert ([#3](https://github.com/catalystsquad/data-mover-destination-mongodb/issues/3)) ([5811837](https://github.com/catalystsquad/data-mover-destination-mongodb/commit/5811837bb4655fb381a38930296d8772fe433164))
+
 ## [1.0.1](https://github.com/catalystsquad/data-mover-destination-mongodb/compare/v1.0.0...v1.0.1) (2022-03-25)
 
 
