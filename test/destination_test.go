@@ -122,7 +122,6 @@ func (s *DestinationSuite) TestConcurrentMove() {
 			}
 		}
 		cursor, err := dest.Collection.Find(ctx, filter)
-		// result := dest.Collection.FindOne(ctx, filter)
 		assert.NoError(s.T(), err)
 		dbRecords := []map[string]interface{}{}
 		for cursor.Next(context.TODO()) {
