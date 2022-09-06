@@ -18,19 +18,21 @@ type MongoDBDestination struct {
 	QueryTimeout            time.Duration
 	DatabaseName            string
 	CollectionName          string
-	UniqueIDFieldName       string
+	MongoIndexModels        []mongo.IndexModel
+	UpsertFilterFields      []string
 	Client                  *mongo.Client
 	Collection              *mongo.Collection
 }
 
-func NewMongoDBDestination(uri, connectionTimeout, queryTimeout, database, collection, uniqueIDFieldName string) *MongoDBDestination {
+func NewMongoDBDestination(uri, connectionTimeout, queryTimeout, database, collection string, upsertFilterFields []string, mongoIndexModels []mongo.IndexModel) *MongoDBDestination {
 	return &MongoDBDestination{
 		Uri:                     uri,
 		ConnectionTimeoutString: connectionTimeout,
 		QueryTimeoutString:      queryTimeout,
 		DatabaseName:            database,
 		CollectionName:          collection,
-		UniqueIDFieldName:       uniqueIDFieldName,
+		MongoIndexModels:        mongoIndexModels,
+		UpsertFilterFields:      upsertFilterFields,
 	}
 }
 
@@ -65,12 +67,15 @@ func (d *MongoDBDestination) Initialize() error {
 	// set the collection
 	d.Collection = d.Client.Database(d.DatabaseName).Collection(d.CollectionName)
 
-	// set a unique ID field index on the collection
-	_, err = d.Collection.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{Key: d.UniqueIDFieldName, Value: 1}},
-		Options: options.Index().SetUnique(true),
-	})
-	return err
+	// create collection indexes for improving upsert capability
+	if len(d.MongoIndexModels) > 0 {
+		_, err = d.Collection.Indexes().CreateMany(ctx, d.MongoIndexModels)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (d *MongoDBDestination) Persist(data []map[string]interface{}) error {
@@ -84,7 +89,10 @@ func (d *MongoDBDestination) Persist(data []map[string]interface{}) error {
 		if err != nil {
 			return err
 		}
-		filter := bson.M{d.UniqueIDFieldName: item[d.UniqueIDFieldName]}
+		filter := bson.M{}
+		for _, field := range d.UpsertFilterFields {
+			filter[field] = item[field]
+		}
 		_, err = d.Collection.UpdateOne(ctx, filter, doc, options.Update().SetUpsert(true))
 		if err != nil {
 			return err
