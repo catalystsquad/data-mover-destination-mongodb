@@ -24,4 +24,5 @@ jobs:
       - name: Test
         uses: catalystsquad/action-test-go@v1
         with:
+          go-version: "1.21"
           pre-command: git config --global url."https://${{ secrets.AUTOMATION_PAT }}@github.com".insteadOf "https://github.com"
